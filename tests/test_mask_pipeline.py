@@ -1,4 +1,4 @@
-"""Tests for MaskPipelineService's orchestration (policy lookup, fetch, mask, upload)."""
+"""Tests for MaskPipelineService's orchestration (policy lookup, fetch, mask, upload, no persistence)."""
 
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
@@ -84,7 +84,11 @@ async def test_run_generates_a_document_id_masks_uploads_and_returns_presigned_u
     assert response.masked_file_url == f"https://s3.example.com/{expected_key}?sig=abc"
     assert response.fields_masked == 1
     assert response.tokens_generated == 1
-    assert response.tokens_persisted == 1
+
+    assert len(response.tokens) == 1
+    entry = response.tokens[0]
+    assert entry.field_type == "Name"
+    assert entry.original_value == "Alice"
 
     s3.upload_bytes.assert_awaited_once()
     upload_key, upload_body = s3.upload_bytes.call_args.args[0], s3.upload_bytes.call_args.args[1]
@@ -92,7 +96,8 @@ async def test_run_generates_a_document_id_masks_uploads_and_returns_presigned_u
     assert b"Alice" not in upload_body
 
     s3.presigned_url.assert_awaited_once_with(expected_key, expires_in=3600)
-    session.commit.assert_awaited()
+    # Nothing is persisted server-side anymore - the pipeline never commits.
+    session.commit.assert_not_awaited()
 
 
 async def test_run_generates_a_different_document_id_each_call(monkeypatch: pytest.MonkeyPatch):

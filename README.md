@@ -24,24 +24,30 @@ Parse              defusedxml, namespace-aware (XXE-safe)
   ▼
 Mask               deterministic per-field tokenization (SHA-256-based) -
   │                same value always maps to the same token; original
-  │                values are stored separately (mask_tokens), never
-  │                logged
-  ▼
-Persist tokens     mask_tokens (Postgres), upserted on (document_id, token)
-  │                so re-masking the same document id is idempotent
+  │                values are never logged
   ▼
 Upload             masked XML uploaded to S3 at masked/{document_id}.xml
   │                (re-masking the same document id overwrites its
   │                 previous masked file)
   ▼
-Return             document id + presigned S3 URL to the masked file
+Return             document id + presigned S3 URL + every token generated,
+                   with its original value (see "Nothing is persisted"
+                   below)
 ```
+
+Nothing is persisted server-side: the reversible token -> original-value
+map exists only in the response of the call that produced it. There's no
+document table and no token-storage table - re-running the same request
+against the same `document_url` generates a fresh document id and a fresh
+token map each time (the S3 upload is the only side effect, and it
+overwrites the previous masked file only if the same document id is reused,
+which the caller doesn't control).
 
 ## API
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /api/v1/mask` | Fetches `document_url`, masks it per `masking_policy_id`, uploads the result to S3, and returns the generated document id, a presigned URL to the masked file, and masking stats. |
+| `POST /api/v1/mask` | Fetches `document_url`, masks it per `masking_policy_id`, uploads the result to S3, and returns the generated document id, a presigned URL to the masked file, masking stats, and the full list of masked tokens with their original values. |
 
 ## Project layout
 
@@ -51,9 +57,9 @@ app/
   core/                 # Settings, rate limiter
   api/deps.py            # Shared FastAPI dependency providers (DB session, S3 client, pipeline service)
   api/v1/routes/         # mask
-  models/                # SQLModel tables: MaskingPolicy, MaskToken
+  models/                # SQLModel tables: MaskingPolicy
   schemas/               # Request/response shapes + the internal MaskingResult
-  services/               # MaskingService, TokenPersistenceService, MaskPipelineService
+  services/               # MaskingService, MaskPipelineService
 
 libs/                    # Small, reusable, project-agnostic infra helpers
                           # (Postgres/S3 client, logging, metrics, errors,

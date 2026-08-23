@@ -6,13 +6,15 @@ document_url + masking_policy_id
   -> look up the MaskingPolicy (must exist and be active)
   -> fetch the XML from document_url (SSRF-guarded, size/timeout bounded)
   -> MaskingService.mask()          - tokenize sensitive fields
-  -> TokenPersistenceService.persist() - save the reversible token map
-     (mask_tokens is the only thing persisted; MaskToken.document_id scopes
-     those rows, it isn't a foreign key to a document table this service owns)
   -> S3Client.upload_bytes()        - upload the masked XML
   -> S3Client.presigned_url()       - hand back a time-limited download link
 
-Keeps HTTP/S3/DB orchestration out of the route handler - the route only
+Nothing is persisted server-side: the reversible token -> original-value
+map is returned directly in the response (see MaskDocumentResponse.tokens)
+rather than written to a table, so this response is the only place that
+mapping exists once the request completes.
+
+Keeps HTTP/S3 orchestration out of the route handler - the route only
 translates this service's result to/from the API schema.
 """
 
@@ -22,8 +24,8 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.masking_policy import MaskingPolicy
-from app.schemas.masking import MaskDocumentResponse
-from app.services.masking import MaskingService, TokenPersistenceService
+from app.schemas.masking import MaskDocumentResponse, MaskedTokenEntry
+from app.services.masking import MaskingService
 from libs.db import uuid7
 from libs.errors import BadRequestError, NotFoundError
 from libs.utils.http_fetch import FetchFailedError, InvalidUrlError, ResponseTooLargeError, fetch_url
@@ -65,7 +67,6 @@ class MaskPipelineService:
         self._presigned_url_expiry_seconds = presigned_url_expiry_seconds
         self._logger = logger
         self._masking_service = MaskingService(logger=logger)
-        self._token_persistence_service = TokenPersistenceService(session, logger=logger)
 
     async def _get_active_policy(self, masking_policy_id: UUID) -> MaskingPolicy:
         """Look up a MaskingPolicy by id, requiring it to exist and be active."""
@@ -85,11 +86,10 @@ class MaskPipelineService:
         return f"masked/{document_id}.xml"
 
     async def run(self, document_url: str, masking_policy_id: UUID) -> MaskDocumentResponse:
-        """Fetch, mask, persist tokens for, and upload one document.
+        """Fetch, mask, and upload one document; return its tokens directly (nothing is persisted).
 
         Generates a fresh document id for this run (there's no document
-        table to receive one from) and returns it, so the caller has a
-        handle for looking up the masked file / mask_tokens rows later.
+        table to receive one from) and returns it in the response.
 
         Args:
             document_url: HTTPS URL the source XML is fetched from.
@@ -101,8 +101,10 @@ class MaskPipelineService:
                 scheme validation, or the fetched document exceeds the size limit.
 
         Returns:
-            MaskDocumentResponse: The generated document id, masking stats, and
-            a presigned URL to the masked file.
+            MaskDocumentResponse: The generated document id, masking stats, a
+            presigned URL to the masked file, and every token generated with
+            its original value - the only place that reversible mapping
+            exists once this call returns.
         """
         document_id = uuid7()
         policy = await self._get_active_policy(masking_policy_id)
@@ -123,9 +125,6 @@ class MaskPipelineService:
 
         result = self._masking_service.mask(fetched.content, policy, str(document_id))
 
-        tokens_persisted = await self._token_persistence_service.persist(result)
-        await self._session.commit()
-
         object_key = self._masked_object_key(document_id)
         await self._s3.upload_bytes(object_key, result.masked_xml, content_type="application/xml")
         masked_file_url = await self._s3.presigned_url(object_key, expires_in=self._presigned_url_expiry_seconds)
@@ -137,7 +136,6 @@ class MaskPipelineService:
                 masking_policy_id=str(masking_policy_id),
                 fields_masked=result.fields_masked,
                 tokens_generated=result.tokens_generated,
-                tokens_persisted=tokens_persisted,
             )
 
         return MaskDocumentResponse(
@@ -146,5 +144,8 @@ class MaskPipelineService:
             masked_file_url=masked_file_url,
             fields_masked=result.fields_masked,
             tokens_generated=result.tokens_generated,
-            tokens_persisted=tokens_persisted,
+            tokens=[
+                MaskedTokenEntry(token=token, field_type=field_type, original_value=original_value)
+                for token, (original_value, field_type) in result.token_map.items()
+            ],
         )

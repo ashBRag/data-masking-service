@@ -10,9 +10,9 @@ from pydantic import BaseModel, Field
 class MaskingResult:
     """The output of masking one document: the masked XML, stats, and the token map.
 
-    `token_map` (token -> (original_value, field_type)) carries the
-    original values needed to persist a reversible lookup - it exists to be
-    read by TokenPersistenceService, not to be logged. Never log this field.
+    `token_map` (token -> (original_value, field_type)) carries the original
+    values that go straight into MaskDocumentResponse.tokens - nothing is
+    persisted server-side. Never log this field.
     """
 
     document_id: str
@@ -38,12 +38,26 @@ class MaskDocumentRequest(BaseModel):
     masking_policy_id: UUID = Field(description="Id of the MaskingPolicy to apply.")
 
 
+class MaskedTokenEntry(BaseModel):
+    """One token -> original-value mapping, returned so the caller can reverse a mask if needed.
+
+    Nothing is persisted server-side - this response is the only place the
+    reversible mapping exists once the request completes.
+    """
+
+    token: str
+    field_type: str
+    original_value: str
+
+
 class MaskDocumentResponse(BaseModel):
     """POST /api/v1/mask response body."""
 
-    document_id: UUID = Field(description="Id generated for this document; scopes the persisted MaskToken rows.")
+    document_id: UUID = Field(description="Id generated for this document.")
     masking_policy_id: UUID
     masked_file_url: str = Field(description="Presigned URL the masked document was uploaded to.")
     fields_masked: int
     tokens_generated: int
-    tokens_persisted: int
+    tokens: list[MaskedTokenEntry] = Field(
+        description="Every token generated for this document, with its original value."
+    )
