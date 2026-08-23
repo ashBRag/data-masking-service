@@ -6,8 +6,11 @@ uploads the masked result to S3.
 ## Pipeline
 
 ```
-document_id + document_url + masking_policy_id
+document_url + masking_policy_id
   │
+  ▼
+Generate id        a fresh document id is generated for this run
+  │                (no document table here to source one from)
   ▼
 Look up policy    MaskingPolicy row (must be is_active=True)
   │
@@ -25,19 +28,20 @@ Mask               deterministic per-field tokenization (SHA-256-based) -
   │                logged
   ▼
 Persist tokens     mask_tokens (Postgres), upserted on (document_id, token)
-  │                so re-masking the same document is idempotent
+  │                so re-masking the same document id is idempotent
   ▼
 Upload             masked XML uploaded to S3 at masked/{document_id}.xml
-  │                (re-masking overwrites the previous masked file)
+  │                (re-masking the same document id overwrites its
+  │                 previous masked file)
   ▼
-Return             presigned S3 URL to the masked file
+Return             document id + presigned S3 URL to the masked file
 ```
 
 ## API
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /api/v1/mask` | Fetches `document_url`, masks it per `masking_policy_id`, uploads the result to S3, and returns a presigned URL to the masked file plus masking stats. |
+| `POST /api/v1/mask` | Fetches `document_url`, masks it per `masking_policy_id`, uploads the result to S3, and returns the generated document id, a presigned URL to the masked file, and masking stats. |
 
 ## Project layout
 
@@ -45,16 +49,18 @@ Return             presigned S3 URL to the masked file
 app/
   main.py             # Wires everything together with this project's settings/routes
   core/                 # Settings, rate limiter
+  api/deps.py            # Shared FastAPI dependency providers (DB session, S3 client, pipeline service)
   api/v1/routes/         # mask
   models/                # SQLModel tables: MaskingPolicy, MaskToken
   schemas/               # Request/response shapes + the internal MaskingResult
   services/               # MaskingService, TokenPersistenceService, MaskPipelineService
 
 libs/                    # Small, reusable, project-agnostic infra helpers
-                          # (Postgres/AWS clients, logging, metrics, errors,
+                          # (Postgres/S3 client, logging, metrics, errors,
                           #  XML/tokenization utilities, SSRF-guarded HTTP fetch, ...)
 
 scripts/                 # Seed script for masking policies
+tests/                   # Unit tests (http fetch SSRF guardrails, mask pipeline orchestration)
 ```
 
 ## Requirements

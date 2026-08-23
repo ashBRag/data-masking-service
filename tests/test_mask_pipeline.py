@@ -57,7 +57,7 @@ async def test_run_raises_bad_request_for_inactive_policy(monkeypatch: pytest.Mo
         await service.run("https://example.com/file.xml", uuid4())
 
 
-async def test_run_mints_a_document_id_masks_uploads_and_returns_presigned_url(monkeypatch: pytest.MonkeyPatch):
+async def test_run_generates_a_document_id_masks_uploads_and_returns_presigned_url(monkeypatch: pytest.MonkeyPatch):
     policy = _make_policy()
     session = AsyncMock()
     session.get.return_value = policy
@@ -76,7 +76,7 @@ async def test_run_mints_a_document_id_masks_uploads_and_returns_presigned_url(m
     service = _make_service(session, s3, monkeypatch)
     response = await service.run("https://example.com/file.xml", policy.id)
 
-    # No document_id is passed in - the service must mint its own.
+    # No document_id is passed in - the service must generate its own.
     assert isinstance(response.document_id, UUID)
     expected_key = f"masked/{response.document_id}.xml"
 
@@ -95,7 +95,7 @@ async def test_run_mints_a_document_id_masks_uploads_and_returns_presigned_url(m
     session.commit.assert_awaited()
 
 
-async def test_run_mints_a_different_document_id_each_call(monkeypatch: pytest.MonkeyPatch):
+async def test_run_generates_a_different_document_id_each_call(monkeypatch: pytest.MonkeyPatch):
     policy = _make_policy()
     session = AsyncMock()
     session.get.return_value = policy

@@ -19,7 +19,7 @@ async def mask_document(
 ) -> MaskDocumentResponse:
     """Fetch `document_url`, mask it per `masking_policy_id`, and upload the result.
 
-    Steps: mint a document id -> look up the masking policy (must exist and
+    Steps: generate a document id -> look up the masking policy (must exist and
     be active) -> fetch the XML from `document_url` (HTTPS only,
     SSRF-guarded, size/timeout bounded) -> mask sensitive fields -> persist
     the reversible token map -> upload the masked XML to S3 -> return a

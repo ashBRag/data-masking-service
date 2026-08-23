@@ -1,7 +1,7 @@
 """MaskPipelineService: orchestrates the mask-and-upload flow for one document.
 
 document_url + masking_policy_id
-  -> mint a fresh document id (nothing to look one up against here - no
+  -> generate a fresh document id (nothing to look one up against here - no
      document table, just a mask-and-return-a-link job)
   -> look up the MaskingPolicy (must exist and be active)
   -> fetch the XML from document_url (SSRF-guarded, size/timeout bounded)
@@ -87,9 +87,9 @@ class MaskPipelineService:
     async def run(self, document_url: str, masking_policy_id: UUID) -> MaskDocumentResponse:
         """Fetch, mask, persist tokens for, and upload one document.
 
-        Mints a fresh document id for this run (there's no document table
-        to receive one from) and returns it, so the caller has a handle for
-        looking up the masked file / mask_tokens rows later.
+        Generates a fresh document id for this run (there's no document
+        table to receive one from) and returns it, so the caller has a
+        handle for looking up the masked file / mask_tokens rows later.
 
         Args:
             document_url: HTTPS URL the source XML is fetched from.
@@ -101,7 +101,7 @@ class MaskPipelineService:
                 scheme validation, or the fetched document exceeds the size limit.
 
         Returns:
-            MaskDocumentResponse: The minted document id, masking stats, and
+            MaskDocumentResponse: The generated document id, masking stats, and
             a presigned URL to the masked file.
         """
         document_id = uuid7()

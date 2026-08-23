@@ -9,7 +9,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "uvicorn[standard]>=0.35.0",
     # Validation / configuration
-    "pydantic[email]>=2.11",
+    "pydantic>=2.11",
     "pydantic-settings>=2.10",
     # PostgreSQL
     "sqlmodel>=0.0.24",
@@ -17,22 +17,17 @@ dependencies = [
     "psycopg[binary,pool]>=3.2",
     "uuid-utils>=0.9",  # UUIDv7 generation for time-ordered primary keys
     "httpx>=0.28",
-    "python-multipart>=0.0.20",
-    # Auth / security
+    # Auth / security (pyjwt: opportunistic bearer-token decode for log context, see libs/middleware)
     "pyjwt[crypto]>=2.10",
-    "pwdlib[argon2]>=0.2",
-    # Reliability
-    "tenacity>=9.1",
     # Logging / metrics
     "structlog>=25.4",
     "prometheus-client>=0.22",
     # Rate limiting
     "slowapi>=0.1.9",
-    # AWS (S3, SQS)
+    # AWS (S3)
     "aioboto3>=13.2",
     # XML parsing (XXE-safe)
     "defusedxml>=0.7",
-    "tokenizers>=0.23.1",
 ]
 
 [dependency-groups]

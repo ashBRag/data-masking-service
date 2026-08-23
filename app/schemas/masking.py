@@ -26,8 +26,8 @@ class MaskDocumentRequest(BaseModel):
     """POST /api/v1/mask request body.
 
     No document_id: this service has no document table to look one up
-    against, so it mints one itself (see MaskPipelineService.run) and hands
-    it back in the response.
+    against, so it generates one itself (see MaskPipelineService.run) and
+    hands it back in the response.
     """
 
     document_url: str = Field(
@@ -41,7 +41,7 @@ class MaskDocumentRequest(BaseModel):
 class MaskDocumentResponse(BaseModel):
     """POST /api/v1/mask response body."""
 
-    document_id: UUID = Field(description="Id minted for this document; scopes the persisted MaskToken rows.")
+    document_id: UUID = Field(description="Id generated for this document; scopes the persisted MaskToken rows.")
     masking_policy_id: UUID
     masked_file_url: str = Field(description="Presigned URL the masked document was uploaded to.")
     fields_masked: int

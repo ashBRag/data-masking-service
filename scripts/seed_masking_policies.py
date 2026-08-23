@@ -31,12 +31,11 @@ SAMPLE_POLICIES = [
             # labels - a resource's name and the users who created/last
             # updated a record are genuine PII; a project or activity name
             # (e.g. "MHRNP1 - ARC", "Approval for shore pile") is a business
-            # label, not personal or "absolutely confidential" data, and
-            # masking it made chat answers meaningfully less useful (can't
-            # reference a project or task by its real name) for no privacy
-            # benefit. Scoped by parent tag (Resource/Name) since "Name"
-            # alone would also match Activity/Name, Project/Name, etc. -
-            # see docs/services/masking.md's "Field scoping" section.
+            # label, not personal or "absolutely confidential" data. Scoped
+            # by parent tag (Resource/Name) since "Name" alone would also
+            # match Activity/Name, Project/Name, etc - see mask_xml's
+            # docstring (libs/utils/xml_masking.py) for the "Parent/Tag"
+            # scoping syntax.
             "Resource/Name",
             "CreateUser",
             "LastUpdateUser",

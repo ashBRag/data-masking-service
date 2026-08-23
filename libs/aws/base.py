@@ -1,29 +1,23 @@
-"""Reusable async AWS clients: S3 and SQS only (aioboto3).
+"""Reusable async AWS client: S3 only (aioboto3).
 
-Generic and reusable: both classes take an `AwsSettings` value object
-instead of importing any project's settings class, so they can be reused
-as-is in another project.
+Generic and reusable: takes an `AwsSettings` value object instead of
+importing any project's settings class, so it can be reused as-is in
+another project.
 
 Each call opens a fresh client from the shared aioboto3.Session as an async
 context manager - this matches aioboto3's own recommended usage (clients
 are cheap to create and not meant to be held open indefinitely), so there's
-no connect()/disconnect() lifecycle here unlike libs/db, libs/redis, libs/kafka.
+no connect()/disconnect() lifecycle here unlike libs/db.
 
 Usage:
 
-    from libs.aws import AwsSettings, S3Client, SqsClient
+    from libs.aws import AwsSettings, S3Client
 
     aws_settings = AwsSettings(region_name=settings.AWS_REGION)
     s3 = S3Client(aws_settings, bucket=settings.S3_BUCKET)
-    sqs = SqsClient(aws_settings, queue_url=settings.SQS_QUEUE_URL)
 
     await s3.upload_bytes("path/to/key.json", b'{"a": 1}')
     data = await s3.download_bytes("path/to/key.json")
-
-    await sqs.send_message('{"event": "..."}')
-    for msg in await sqs.receive_messages():
-        ...
-        await sqs.delete_message(msg["ReceiptHandle"])
 """
 
 from dataclasses import dataclass
@@ -105,64 +99,6 @@ class S3Client:
         try:
             async with self._session.client("s3", **self._settings.session_kwargs()) as s3:
                 await s3.head_bucket(Bucket=self._bucket)
-            return True
-        except Exception:
-            return False
-
-
-class SqsClient:
-    """Thin async wrapper around the subset of SQS operations most services need."""
-
-    def __init__(self, settings: AwsSettings, queue_url: str):
-        """Store settings/queue URL; no connection is opened until a method is called."""
-        self._settings = settings
-        self._queue_url = queue_url
-        self._session = aioboto3.Session()
-
-    async def send_message(self, body: str, delay_seconds: int = 0) -> str:
-        """Send one message and return its MessageId.
-
-        Args:
-            body: Message body (serialize your payload to a string before calling this).
-            delay_seconds: Delivery delay, 0-900 seconds.
-        """
-        async with self._session.client("sqs", **self._settings.session_kwargs()) as sqs:
-            response = await sqs.send_message(
-                QueueUrl=self._queue_url,
-                MessageBody=body,
-                DelaySeconds=delay_seconds,
-            )
-            return response["MessageId"]
-
-    async def receive_messages(self, max_messages: int = 10, wait_time_seconds: int = 0) -> list[dict]:
-        """Poll for up to `max_messages` messages.
-
-        Args:
-            max_messages: 1-10, per the SQS API limit.
-            wait_time_seconds: >0 enables long polling, reducing empty responses.
-
-        Returns:
-            list[dict]: Raw SQS message dicts (each has "Body", "ReceiptHandle", ...);
-            empty list if none are available.
-        """
-        async with self._session.client("sqs", **self._settings.session_kwargs()) as sqs:
-            response = await sqs.receive_message(
-                QueueUrl=self._queue_url,
-                MaxNumberOfMessages=max_messages,
-                WaitTimeSeconds=wait_time_seconds,
-            )
-            return response.get("Messages", [])
-
-    async def delete_message(self, receipt_handle: str) -> None:
-        """Delete a message after successfully processing it, using its ReceiptHandle."""
-        async with self._session.client("sqs", **self._settings.session_kwargs()) as sqs:
-            await sqs.delete_message(QueueUrl=self._queue_url, ReceiptHandle=receipt_handle)
-
-    async def health_check(self) -> bool:
-        """Return True if the queue's attributes can be fetched, False on any error."""
-        try:
-            async with self._session.client("sqs", **self._settings.session_kwargs()) as sqs:
-                await sqs.get_queue_attributes(QueueUrl=self._queue_url, AttributeNames=["QueueArn"])
             return True
         except Exception:
             return False
