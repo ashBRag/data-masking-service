@@ -5,6 +5,7 @@ app-wide singletons constructed in app/main.py (db, s3, logger).
 """
 
 from collections.abc import AsyncIterator
+from functools import partial
 from typing import Annotated
 
 from fastapi import Depends
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.services.mask_pipeline import MaskPipelineService
+from libs.auth import require_scopes as _require_scopes
 from libs.aws import S3Client
 
 
@@ -52,3 +54,14 @@ def get_mask_pipeline_service(session: SessionDep, s3: S3ClientDep) -> MaskPipel
 
 
 MaskPipelineServiceDep = Annotated[MaskPipelineService, Depends(get_mask_pipeline_service)]
+
+
+# Binds this project's JWT settings to the generic libs.auth dependency
+# factory - route code calls require_scopes("orders:read", ...) same as before.
+require_scopes = partial(
+    _require_scopes,
+    secret_key=settings.JWT_SECRET_KEY,
+    algorithm=settings.JWT_ALGORITHM,
+    issuer=settings.JWT_ISSUER,
+    audience=settings.JWT_AUDIENCE,
+)

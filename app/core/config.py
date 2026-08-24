@@ -30,6 +30,13 @@ class Settings(BaseAppSettings):
         "mask": ["20 per minute"],
     }
 
+    # JWT auth for route access (see app/api/deps.py:require_scopes). Distinct
+    # from JWT_SECRET_KEY/JWT_ALGORITHM (BaseAppSettings) which those two
+    # fields are shared with - this service both issues logging context from
+    # and authenticates requests with the same token.
+    JWT_ISSUER: str = "https://auth.example.com"
+    JWT_AUDIENCE: str = "service-b"
+
     # Postgres connection (see libs/db for the engine/session built from these).
     # Host/port/user/password var names match the shared infra stack's .env -
     # no separate app-only copies for those. POSTGRES_DB is the one exception:

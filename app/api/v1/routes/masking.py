@@ -1,8 +1,8 @@
 """POST /api/v1/mask: mask a document's sensitive fields and upload the result to S3."""
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
-from app.api.deps import MaskPipelineServiceDep
+from app.api.deps import MaskPipelineServiceDep, require_scopes
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.schemas.masking import MaskDocumentRequest, MaskDocumentResponse
@@ -10,7 +10,12 @@ from app.schemas.masking import MaskDocumentRequest, MaskDocumentResponse
 router = APIRouter(tags=["masking"])
 
 
-@router.post("/mask", response_model=MaskDocumentResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/mask",
+    response_model=MaskDocumentResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_scopes())],
+)
 @limiter.limit(settings.RATE_LIMIT_ENDPOINTS["mask"][0])
 async def mask_document(
     request: Request,
