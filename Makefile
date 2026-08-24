@@ -53,6 +53,18 @@ docker-logs:
 
 docker-restart: docker-down docker-up
 
+# docker-compose.prod.yml is an overlay (pulls IMAGE_TAG from ghcr, no
+# build:) 
+docker-prod-up: docker-network
+	@if [ ! -f .env.production ]; then echo "Missing .env.production"; exit 1; fi
+	$(DOCKER_COMPOSE) -f docker-compose.prod.yml up -d
+
+docker-prod-down:
+	$(DOCKER_COMPOSE) -f docker-compose.prod.yml down
+
+docker-prod-logs:
+	$(DOCKER_COMPOSE) -f docker-compose.prod.yml logs -f app
+
 help:
 	@echo "Usage: make <target> [ENV=development|staging|production]"
 	@echo ""
@@ -69,3 +81,7 @@ help:
 	@echo "  docker-down   Stop the app"
 	@echo "  docker-logs   Follow app logs"
 	@echo "  docker-restart  Down then up"
+	@echo ""
+	@echo "  docker-prod-up    Start via docker-compose.prod.yml (needs IMAGE_TAG, .env.production)"
+	@echo "  docker-prod-down  Stop the prod stack"
+	@echo "  docker-prod-logs  Follow prod app logs"
