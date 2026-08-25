@@ -5,8 +5,10 @@ libs/*; this file is only responsible for assembling them with *this*
 project's settings and routes.
 """
 
+import json
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import (
@@ -155,6 +157,12 @@ def custom_openapi() -> dict[str, Any]:
         description=app.description,
         routes=app.routes,
     )
+    jwt_payload_schema = json.loads(
+        (Path(__file__).resolve().parent / "schemas" / "jwt_payload.schema.json").read_text()
+    )
+    schema["components"].setdefault("schemas", {})["JWTPayload"] = {
+        key: value for key, value in jwt_payload_schema.items() if not key.startswith("$")
+    }
     schema["components"]["securitySchemes"] = {
         "BearerAuth": {
             "type": "http",
@@ -162,6 +170,7 @@ def custom_openapi() -> dict[str, Any]:
             "bearerFormat": "JWT",
             "description": (
                 "JWT issued by the auth service (see docs/AUTH.md). "
+                "Payload claims are documented under the `JWTPayload` schema below. "
                 "Required scopes, if any, are listed per-endpoint below."
             ),
         }
