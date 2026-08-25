@@ -49,6 +49,8 @@ which the caller doesn't control).
 |---|---|
 | `POST /api/v1/mask` | Fetches `document_url`, masks it per `masking_policy_id`, uploads the result to S3, and returns the generated document id, a presigned URL to the masked file, masking stats, and the full list of masked tokens with their original values. |
 
+All `/api/v1/...` routes require a JWT bearer token - see [docs/AUTH.md](docs/AUTH.md).
+
 ## Project layout
 
 ```
