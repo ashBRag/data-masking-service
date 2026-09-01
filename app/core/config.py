@@ -6,7 +6,7 @@ this file only adds fields and defaults specific to *this* project.
 
 from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import computed_field, field_validator
 from pydantic_settings import NoDecode
 
 from libs.config import BaseAppSettings, Environment
@@ -18,6 +18,7 @@ class Settings(BaseAppSettings):
     """This project's settings: adds identity/API fields on top of the base."""
 
     PROJECT_NAME: str = "Data Masking Service"
+    PROJECT_SLUG: str = "data-masking-service"
     VERSION: str = "1.0.0"
     DESCRIPTION: str = "Masks sensitive fields in an XML document and uploads the result to S3"
     API_V1_STR: str = "/api/v1"
@@ -34,8 +35,15 @@ class Settings(BaseAppSettings):
     # from JWT_SECRET_KEY/JWT_ALGORITHM (BaseAppSettings) which those two
     # fields are shared with - this service both issues logging context from
     # and authenticates requests with the same token.
-    JWT_ISSUER: str = "https://auth.example.com"
-    JWT_AUDIENCE: str = "service-b"
+    # JWT_ISSUER must come from the environment (no default) - it identifies
+    # the auth service that signed the token, which varies per deployment.
+    JWT_ISSUER: str
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def JWT_AUDIENCE(self) -> str:
+        """Expected 'aud' claim - always PROJECT_SLUG, not independently configurable."""
+        return self.PROJECT_SLUG
 
     # Postgres connection (see libs/db for the engine/session built from these).
     # Host/port/user/password var names match the shared infra stack's .env -
